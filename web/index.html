@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rephrase AI - Humanize, Detect, and Check Text</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Rephrase AI</h1>
+            <p>Your all-in-one suite for text perfection.</p>
+        </header>
+
+        <nav class="action-tabs">
+            <button class="tab-btn active" data-action="humanize">Humanize</button>
+            <button class="tab-btn" data-action="detect">Detect AI</button>
+            <button class="tab-btn" data-action="plagiarize">Check Plagiarism</button>
+        </nav>
+
+        <main class="core-interface">
+            <div class="input-panel">
+                <textarea id="inputText" placeholder="Enter text here..."></textarea>
+                <div class="textarea-footer">
+                    <span id="wordCount">0 / 200 words</span>
+                </div>
+            </div>
+
+            <div class="output-panel">
+                <div id="loader" class="loader-overlay hidden">
+                    <div class="loader-spinner"></div>
+                </div>
+                <div id="results-container">
+                    <!-- Results will be dynamically inserted here -->
+                </div>
+            </div>
+        </main>
+        
+        <div id="humanize-options" class="sub-options">
+            <div class="control-group">
+                <label for="tone">Tone</label>
+                <select id="tone">
+                    <option value="Casual" selected>Casual</option>
+                    <option value="Formal">Formal</option>
+                    <option value="Confident">Confident</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="complexity">Complexity</label>
+                <select id="complexity">
+                    <option value="Standard (University)" selected>Standard</option>
+                    <option value="Simple (8th Grade)">Simple</option>
+                    <option value="Expert (Academic)">Expert</option>
+                </select>
+            </div>
+        </div>
+        
+        <button id="processButton" disabled>Select an Action</button>
+        <div id="error-message" class="error"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
