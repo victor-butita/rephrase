@@ -1,93 +1,110 @@
-Rephrase AI – Text Analysis & Enhancement Suite
-Rephrase AI is a modern, web-based text improvement platform built in Go, designed to help refine, verify, and perfect written content.
-It leverages the Google Gemini API to offer three powerful capabilities:
+# Rephrase AI – The Professional Writing Suite
 
-Humanize Robotic Text – Transform AI-like or stiff prose into natural, human-like writing.
+Rephrase AI is a modern, web-based text analysis and enhancement suite built with a powerful **Go** backend and a dynamic vanilla JavaScript frontend. It leverages the Google Gemini API to provide a seamless, all-in-one workspace for writers, editors, and content creators to perfect their text.
 
-Detect AI-Generated Content – Estimate the likelihood that text was produced by AI.
+This project demonstrates the creation of a full-stack, real-time, API-driven application that is both highly functional and aesthetically polished.
 
-Check for Plagiarism – Identify potential matches from public internet sources.
-
-This project is a full-stack demo featuring a Go backend and a dynamic vanilla JavaScript frontend.
-
-Tip: Replace the placeholder screenshot with one from your running app – it’s your README’s most eye-catching element.
-
-✨ Features
-Multi-Functional Interface
-Humanize – Rewrite stiff or AI text with adjustable tone and complexity.
-
-Detect AI – Display a live gauge showing the likelihood of AI generation.
-
-Check Plagiarism – Provide a detailed source report of online matches.
-
-Polished User Experience
-Live word counter (200-word cap to optimize API usage)
-
-Responsive dark-mode UI
-
-Clear loading states and robust error handling
-
-Robust Go Backend
-Resilient API client – Retries failed API calls with exponential backoff
-
-Clean project structure – Organized into cmd/, internal/handlers, internal/services
-
-Secure configuration – API keys stored in environment variables, never hardcoded
-
-🚀 Why Rephrase AI?
-As AI-generated content becomes more common, the need to refine and verify text is greater than ever.
-Rephrase AI showcases:
-
-API Integration – Uses Google Gemini for advanced text processing
-
-REST API Design – Single clean endpoint /api/process for all actions
-
-Concurrency & Error Handling – Graceful recovery from network/API failures
-
-Full-Stack Development – Go backend + vanilla JS frontend for a seamless experience
-
-🛠 Getting Started
-Prerequisites
-Go 1.18+
-
-Google Gemini API Key (obtain from Google AI Studio)
-
-Installation
-
-git clone https://github.com/YOUR-USERNAME/rephrase.git
-
-cd rephrase
-(Replace YOUR-USERNAME with your GitHub handle)
-
-Create a .env file in the project root:
-
-ini
-Copy
-Edit
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
-(This is .gitignored for security.)
-
-Install dependencies:
+![Rephrase AI Dashboard](./screenshot.jpeg)
 
 
-go mod tidy
-Run the server:
+---
 
+## ✨ Features
 
-go run ./cmd/server/
-Open in browser:
+-   **Multi-Tool Dashboard:** A clean, sidebar-based interface to switch between four powerful tools:
+    -   **Humanizer:** Rewrites text with granular control over **Tone**, **Complexity**, and **Dialect**. Includes advanced options like **"Freeze Keywords"** to protect important terms.
+    -   **AI Detector:** Provides an overall percentage score and **highlights specific sentences** most likely to be AI-generated.
+    -   **Plagiarism Check:** Scans text against public internet content and returns a report with potential matches and source links.
+    -   **AI Research:** Acts as a research assistant, generating a concise, Markdown-formatted summary on any given topic.
+-   **Live & Interactive UI:**
+    -   **Real-Time Stats:** A "trafficky" sidebar panel displays live platform usage statistics, pushed from the server via **WebSockets**.
+    -   **Dynamic Content Panels:** The workspace intelligently adapts to the selected tool, showing relevant options and results.
+    -   **Professional UX:** Includes a live word counter, clear loading states, and robust error feedback, all wrapped in a polished, light-themed design.
+-   **Robust Go Backend:**
+    -   **Concurrent & Real-Time:** Utilizes a WebSocket hub with goroutines and channels to manage multiple clients and broadcast live stat updates without blocking.
+    -   **Resilient API Client:** Automatically retries failed API calls with exponential backoff to handle temporary service unavailability (e.g., `503` errors).
+    -   **Secure & Scalable:** Follows professional Go project structure (`cmd`, `internal/handlers`, `internal/services`) and manages API keys securely through environment variables.
 
-arduino
+---
 
-http://localhost:8080
-🔬 How to Use
-Select an Action – Choose Humanize, Detect AI, or Check Plagiarism
+## 🛠️ Tech Stack
 
-Enter Text – Type or paste into the left panel (word counter updates live)
+| Backend              | Frontend             |
+| -------------------- | -------------------- |
+| **Go** (`net/http`)  | **Vanilla JS (ES6)** |
+| **Gorilla WebSocket**| **HTML5**            |
+| **Google Gemini API**| **CSS3**             |
+|                      | **Marked.js**        |
 
-Adjust Options – For Humanize, choose tone & complexity
+---
 
-Process – Click the action button (loader will appear)
+## 🚀 Getting Started
 
-View Results – Right panel updates with refined text, AI likelihood score, or plagiarism results
+### Prerequisites
 
+-   **Go** (version 1.18 or newer).
+-   A **Google Gemini API Key** (obtainable from [Google AI Studio](https://aistudio.google.com/app/apikey)).
+
+### Installation & Running
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/YOUR-USERNAME/rephrase.git
+    cd rephrase
+    ```
+
+2.  **Set up your environment:**
+    -   Create a file named `.env` in the project root.
+    -   Add your API key to this file:
+        ```
+        GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
+        ```
+    -   *The `.env` file is included in `.gitignore` to keep your secrets safe.*
+
+3.  **Tidy dependencies:** This command will download the necessary Go modules (`gorilla/websocket`, etc.).
+    ```bash
+    go mod tidy
+    ```
+
+4.  **Run the server:**
+    ```bash
+    go run ./cmd/server/
+    ```
+
+5.  **Open the application:** Launch your web browser and navigate to:
+    **[http://localhost:8080](http://localhost:8080)**
+
+---
+
+## 🔬 How to Use
+
+1.  **Select a Tool:** Use the sidebar to choose between Humanizer, AI Detector, Plagiarism Check, or AI Research.
+2.  **Enter Text:** Paste your text or research topic into the main editor panel on the left.
+3.  **Configure Options:** If using the Humanizer, adjust the Tone, Complexity, Dialect, and Freeze Keywords to fit your needs.
+4.  **Process:** Click the action button (e.g., "Humanize").
+5.  **View Results:** The results will appear instantly in the right-hand panel, formatted for the specific tool you used.
+6.  **Watch the Stats:** See the live platform stats in the sidebar update in real-time as you and other users interact with the application.
+
+---
+
+## 📂 Project Structure
+
+rephrase/
+├── .env                  # Local environment variables (ignored by Git)
+├── .gitignore
+├── go.mod
+├── README.md             # Project documentation
+├── screenshot.png        # Application screenshot
+├── cmd/
+│   └── server/
+│       └── main.go       # Application entry point: server & dependency setup
+└── internal/
+    ├── handlers/
+    │   ├── process_handler.go   # Handles HTTP API requests for all tools
+    │   └── websocket_handler.go # Manages WebSocket connections, hub, and stats
+    ├── services/
+    │   └── gemini_service.go    # Core business logic, integrates with Gemini API
+    └── web/
+        ├── index.html           # Main UI
+        ├── style.css            # Stylesheet
+        └── script.js            # Client-side logic

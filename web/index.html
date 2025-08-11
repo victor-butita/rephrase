@@ -3,65 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rephrase AI - Humanize, Detect, and Check Text</title>
+    <title>Rephrase AI - Professional Writing Suite</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Rephrase AI</h1>
-            <p>Your all-in-one suite for text perfection.</p>
-        </header>
+    <div class="app-container">
+        <!-- ===== Sidebar ===== -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <svg class="logo-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <h1 class="logo-text">Rephrase AI</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <p class="nav-heading">Tools</p>
+                <a href="#" class="nav-link active" data-action="humanize">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 20v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8zM23 20v-2a4 4 0 00-3-3.87" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Humanizer</span>
+                </a>
+                <a href="#" class="nav-link" data-action="detect">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>AI Detector</span>
+                </a>
+                <a href="#" class="nav-link" data-action="plagiarize">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16M4 12h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Plagiarism Check</span>
+                </a>
+                <a href="#" class="nav-link" data-action="research">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 6.25278V19.2528M8.74722 3L15.2528 3M8.74722 22L15.2528 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>AI Research</span>
+                </a>
+            </nav>
+            <div class="sidebar-stats">
+                <p class="nav-heading">Live Platform Stats</p>
+                <div class="stat-item"><span>Humanizations</span><strong id="stat-humanize">0</strong></div>
+                <div class="stat-item"><span>AI Detections</span><strong id="stat-detect">0</strong></div>
+                <div class="stat-item"><span>Plagiarism Checks</span><strong id="stat-plagiarize">0</strong></div>
+                <div class="stat-item"><span>Research Queries</span><strong id="stat-research">0</strong></div>
+            </div>
+        </aside>
 
-        <nav class="action-tabs">
-            <button class="tab-btn active" data-action="humanize">Humanize</button>
-            <button class="tab-btn" data-action="detect">Detect AI</button>
-            <button class="tab-btn" data-action="plagiarize">Check Plagiarism</button>
-        </nav>
+        <!-- ===== Main Wrapper ===== -->
+        <div class="main-wrapper">
+            <header class="main-header">
+                <h2 id="page-title">Humanizer</h2>
+            </header>
 
-        <main class="core-interface">
-            <div class="input-panel">
-                <textarea id="inputText" placeholder="Enter text here..."></textarea>
-                <div class="textarea-footer">
-                    <span id="wordCount">0 / 200 words</span>
-                </div>
-            </div>
+            <main class="main-content">
+                <!-- **NEW:** A two-column grid for workspace and results -->
+                <div class="content-grid">
+                    <!-- Column 1: Workspace (Input + Options) -->
+                    <div class="workspace-column">
+                        <div class="editor-container">
+                            <textarea id="inputText" placeholder="Enter text to begin..."></textarea>
+                            <div class="textarea-footer"><span id="wordCount">0 / 200 words</span></div>
+                        </div>
 
-            <div class="output-panel">
-                <div id="loader" class="loader-overlay hidden">
-                    <div class="loader-spinner"></div>
+                        <div id="options-wrapper">
+                            <div id="humanize-options" class="options-container">
+                                <div class="options-grid">
+                                    <div class="control-group">
+                                        <label for="tone">Tone</label>
+                                        <select id="tone">
+                                            <option>Casual</option><option>Formal</option><option>Confident</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="complexity">Complexity</label>
+                                        <select id="complexity">
+                                            <option>Standard</option><option>Simple</option><option>Expert</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="dialect">Dialect</label>
+                                        <select id="dialect">
+                                            <option>American English (Default)</option>
+                                            <option>British English</option><option>Australian English</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="advanced-options">
+                                    <div class="control-group">
+                                        <label for="freezeKeywords">Freeze Keywords</label>
+                                        <input type="text" id="freezeKeywords" placeholder="AI, Go, programming...">
+                                        <small>Comma-separated keywords to keep unchanged.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <footer class="main-footer">
+                            <div id="error-message" class="error"></div>
+                            <div class="footer-actions">
+                                <div id="loader" class="loader-spinner hidden"></div>
+                                <button id="processButton" class="btn btn-primary" disabled>Humanize</button>
+                            </div>
+                        </footer>
+                    </div>
+
+                    <!-- Column 2: Results -->
+                    <div class="results-column">
+                        <div id="results-container" class="results-container">
+                             <div id="output-placeholder" class="output-placeholder">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <p>Your results will appear here</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="results-container">
-                    <!-- Results will be dynamically inserted here -->
-                </div>
-            </div>
-        </main>
-        
-        <div id="humanize-options" class="sub-options">
-            <div class="control-group">
-                <label for="tone">Tone</label>
-                <select id="tone">
-                    <option value="Casual" selected>Casual</option>
-                    <option value="Formal">Formal</option>
-                    <option value="Confident">Confident</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="complexity">Complexity</label>
-                <select id="complexity">
-                    <option value="Standard (University)" selected>Standard</option>
-                    <option value="Simple (8th Grade)">Simple</option>
-                    <option value="Expert (Academic)">Expert</option>
-                </select>
-            </div>
+            </main>
         </div>
-        
-        <button id="processButton" disabled>Select an Action</button>
-        <div id="error-message" class="error"></div>
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

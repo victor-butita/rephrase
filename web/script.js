@@ -1,130 +1,142 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // State
+    // --- State ---
     let currentAction = 'humanize';
     const WORD_LIMIT = 200;
 
-    // Element Selectors
-    const tabs = document.querySelectorAll('.tab-btn');
+    // --- Element Selectors ---
+    const navLinks = document.querySelectorAll('.nav-link');
+    const pageTitle = document.getElementById('page-title');
     const processButton = document.getElementById('processButton');
     const inputText = document.getElementById('inputText');
     const wordCountEl = document.getElementById('wordCount');
     const resultsContainer = document.getElementById('results-container');
+    const outputPlaceholder = document.getElementById('output-placeholder');
     const loader = document.getElementById('loader');
     const errorMessage = document.getElementById('error-message');
-    const humanizeOptions = document.getElementById('humanize-options');
+    const optionsWrapper = document.getElementById('options-wrapper');
     const toneSelect = document.getElementById('tone');
     const complexitySelect = document.getElementById('complexity');
+    const dialectSelect = document.getElementById('dialect');
+    const freezeKeywordsInput = document.getElementById('freezeKeywords');
+    
+    // --- WebSocket for Live Stats ---
+    function connectWebSocket() {
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'stats') {
+                document.getElementById('stat-humanize').textContent = data.humanize_count;
+                document.getElementById('stat-detect').textContent = data.detect_count;
+                document.getElementById('stat-plagiarize').textContent = data.plagiarize_count;
+                document.getElementById('stat-research').textContent = data.research_count;
+            }
+        };
+        ws.onclose = () => { setTimeout(connectWebSocket, 3000); };
+    }
     
     // --- Event Listeners ---
-    
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            currentAction = tab.dataset.action;
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentAction = link.dataset.action;
+            navLinks.forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
             updateUIForAction();
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
         });
     });
 
-    inputText.addEventListener('input', () => {
-        const words = inputText.value.trim().split(/\s+/).filter(Boolean);
-        const count = words.length;
-        
-        wordCountEl.textContent = `${count} / ${WORD_LIMIT} words`;
-        wordCountEl.classList.toggle('limit-exceeded', count > WORD_LIMIT);
-        
-        // Disable button if text is empty or over the limit
-        processButton.disabled = count === 0 || count > WORD_LIMIT;
-    });
-
+    inputText.addEventListener('input', validateInputs);
     processButton.addEventListener('click', handleProcessRequest);
 
-    // --- Functions ---
+    // --- Core Functions ---
+    function validateInputs() {
+        const text = inputText.value;
+        const count = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+        wordCountEl.textContent = `${count} / ${WORD_LIMIT} words`;
+        const isOverLimit = currentAction !== 'research' && count > WORD_LIMIT;
+        wordCountEl.classList.toggle('limit-exceeded', isOverLimit);
+        processButton.disabled = count === 0 || isOverLimit;
+    }
 
     function updateUIForAction() {
-        processButton.textContent = currentAction.charAt(0).toUpperCase() + currentAction.slice(1);
-        humanizeOptions.style.display = currentAction === 'humanize' ? 'flex' : 'none';
-        resultsContainer.innerHTML = ''; // Clear previous results
+        const actionText = {
+            humanize: 'Humanizer', detect: 'AI Detector', 
+            plagiarize: 'Plagiarism Check', research: 'AI Research'
+        }[currentAction];
+
+        pageTitle.textContent = actionText;
+        processButton.textContent = currentAction === 'research' ? 'Research Topic' : actionText;
+        
+        optionsWrapper.style.display = currentAction === 'humanize' ? 'block' : 'none';
+        
+        resultsContainer.innerHTML = '';
+        outputPlaceholder.classList.remove('hidden');
         errorMessage.textContent = '';
-        inputText.dispatchEvent(new Event('input')); // Re-validate button state
+        
+        inputText.placeholder = currentAction === 'research' ? 'Enter a topic to research...' : 'Enter text to begin...';
+        validateInputs();
     }
 
     async function handleProcessRequest() {
+        processButton.classList.add('hidden');
         loader.classList.remove('hidden');
-        processButton.disabled = true;
         errorMessage.textContent = '';
         resultsContainer.innerHTML = '';
+        outputPlaceholder.classList.add('hidden');
 
         const requestBody = {
             text: inputText.value,
             action: currentAction,
             tone: toneSelect.value,
-            complexity: complexitySelect.value
+            complexity: complexitySelect.value,
+            dialect: dialectSelect.value,
+            freeze_keywords: freezeKeywordsInput.value
         };
 
         try {
-            const response = await fetch('/api/process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody),
-            });
-
+            const response = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'An unknown error occurred.');
-            
             renderResults(data);
-
         } catch (error) {
             errorMessage.textContent = error.message;
         } finally {
             loader.classList.add('hidden');
-            processButton.disabled = false;
-            // Re-enable the button but respect the word count validation
-            inputText.dispatchEvent(new Event('input')); 
+            processButton.classList.remove('hidden');
         }
     }
     
     function renderResults(data) {
-        // First, ensure the container is clear
         resultsContainer.innerHTML = '';
-        
         switch(data.result_type) {
             case 'humanize':
-                // Create a textarea for the humanized text
-                const resultTextarea = document.createElement('textarea');
-                resultTextarea.readOnly = true;
-                resultTextarea.textContent = data.text;
-                resultsContainer.appendChild(resultTextarea);
+                resultsContainer.innerHTML = `<div class="humanize-result">${escapeHtml(data.text)}</div>`;
                 break;
             case 'detect':
-                resultsContainer.innerHTML = createGaugeHTML(data.ai_score);
+                const highlightedHTML = createHighlightedTextHTML(inputText.value, data.detection_result.sentences);
+                const gaugeHTML = createGaugeHTML(data.detection_result.overall_score);
+                resultsContainer.innerHTML = `<div class="detect-header">${gaugeHTML}</div><div class="highlighted-text-container">${highlightedHTML}</div>`;
                 break;
             case 'plagiarize':
                 resultsContainer.innerHTML = createPlagiarismReportHTML(data.plagiarism_report);
                 break;
+            case 'research':
+                const researchHTML = marked.parse(data.research_result);
+                resultsContainer.innerHTML = `<div class="research-result">${researchHTML}</div>`;
+                break;
         }
     }
 
+    function escapeHtml(unsafe) { return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
     function createGaugeHTML(score) {
         let scoreMessage = `Low AI Likelihood`;
         let color = 'var(--green)';
         if (score > 65) { scoreMessage = `High AI Likelihood`; color = 'var(--red)'; }
         else if (score > 35) { scoreMessage = `Moderate AI Likelihood`; color = 'var(--yellow)';}
-        
-        return `
-            <div class="ai-score-container">
-                <div class="ai-score-circle" style="--score-color: ${color}; --score-percent: ${score}">
-                    <span>${score}%</span>
-                </div>
-                <p class="ai-score-text">${scoreMessage}</p>
-            </div>
-        `;
+        return `<div class="ai-score-container"><div class="ai-score-circle" style="--score-color: ${color}; --score-percent: ${score}"><span>${score}%</span></div><p class="ai-score-text">${scoreMessage}</p></div>`;
     }
-
     function createPlagiarismReportHTML(report) {
-        if (report.trim().toUpperCase() === 'UNIQUE') {
-            return `<div class="plagiarism-unique"><h3>No Significant Plagiarism Found</h3><p>The provided text appears to be unique.</p></div>`;
-        }
+        if (report.trim().toUpperCase() === 'UNIQUE') { return `<div class="plagiarism-unique"><h3>No Significant Plagiarism Found</h3><p>The provided text appears to be unique.</p></div>`; }
         const matches = report.split('\n').filter(line => line.includes('MATCH:'));
         let html = '<h3>Potential Matches Found</h3><ul class="plagiarism-list">';
         matches.forEach(match => {
@@ -137,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return html;
     }
 
-    // Initial setup on page load
+    // --- Initial Setup ---
     updateUIForAction();
+    connectWebSocket();
 });
