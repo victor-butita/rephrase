@@ -9,33 +9,39 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/victor-butita/rephrase/internal/handlers" // Use your module path
 	"github.com/victor-butita/rephrase/internal/services" // Use your module path
-
 )
 
 func main() {
 	// --- Initialization ---
 	err := godotenv.Load()
-	if err != nil { log.Println("No .env file found, reading from environment") }
+	if err != nil {
+		log.Println("No .env file found, reading from environment")
+	}
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey == "" { log.Fatal("GEMINI_API_KEY environment variable is not set") }
+	if geminiAPIKey == "" {
+		log.Fatal("GEMINI_API_KEY environment variable is not set")
+	}
 
 	// --- Dependency Injection ---
 	geminiService := services.NewGeminiService(geminiAPIKey)
-	
-	// **NEW:** Create the Hub and StatsTracker
+
+	// Create the Hub and StatsTracker
 	hub := handlers.NewHub()
 	statsTracker := handlers.NewStatsTracker(hub)
-	
-	// **NEW:** Start the Hub's main loop in a goroutine
-	go hub.Run(statsTracker)
 
-	// **UPDATED:** Inject the StatsTracker into the ProcessHandler
+	// Start the Hub's main loop in a goroutine
+	go hub.Run()
+
+	// Inject the StatsTracker into the ProcessHandler
 	processHandler := handlers.NewProcessHandler(geminiService, statsTracker)
 
 	// --- Routing ---
 	mux := http.NewServeMux()
 	mux.Handle("/api/process", processHandler)
-	mux.HandleFunc("/ws", hub.ServeWs) // **NEW:** WebSocket endpoint
+	// **CORRECTED:** The ServeWs handler is now a closure to pass the statsTracker.
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		hub.ServeWs(w, r, statsTracker)
+	})
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	// --- Start Server ---

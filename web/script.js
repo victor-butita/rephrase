@@ -23,15 +23,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function connectWebSocket() {
         const ws = new WebSocket(`ws://${window.location.host}/ws`);
         ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'stats') {
-                document.getElementById('stat-humanize').textContent = data.humanize_count;
-                document.getElementById('stat-detect').textContent = data.detect_count;
-                document.getElementById('stat-plagiarize').textContent = data.plagiarize_count;
-                document.getElementById('stat-research').textContent = data.research_count;
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'stats') {
+                    document.getElementById('stat-humanize').textContent = data.humanize_count || 0;
+                    document.getElementById('stat-detect').textContent = data.detect_count || 0;
+                    document.getElementById('stat-plagiarize').textContent = data.plagiarize_count || 0;
+                    document.getElementById('stat-research').textContent = data.research_count || 0;
+                }
+            } catch (e) {
+                console.error("Failed to parse websocket message:", e);
             }
         };
         ws.onclose = () => { setTimeout(connectWebSocket, 3000); };
+        ws.onerror = (err) => {
+            console.error("WebSocket error:", err);
+            ws.close();
+        };
     }
     
     // --- Event Listeners ---
@@ -68,8 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
         processButton.textContent = currentAction === 'research' ? 'Research Topic' : actionText;
         
         optionsWrapper.style.display = currentAction === 'humanize' ? 'block' : 'none';
+        wordCountEl.style.display = currentAction === 'research' ? 'none' : 'block';
         
         resultsContainer.innerHTML = '';
+        resultsContainer.appendChild(outputPlaceholder);
         outputPlaceholder.classList.remove('hidden');
         errorMessage.textContent = '';
         
@@ -110,24 +120,57 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.innerHTML = '';
         switch(data.result_type) {
             case 'humanize':
-                resultsContainer.innerHTML = `<div class="humanize-result">${escapeHtml(data.text)}</div>`;
+                // **UI FIX:** Use a div, escape HTML, then replace newlines with <br> to preserve paragraphs without breaking layout.
+                const humanizedText = escapeHtml(data.text).replace(/\n/g, '<br>');
+                resultsContainer.innerHTML = `<div class="humanize-result">${humanizedText}</div>`;
                 break;
             case 'detect':
-                const highlightedHTML = createHighlightedTextHTML(inputText.value, data.detection_result.sentences);
-                const gaugeHTML = createGaugeHTML(data.detection_result.overall_score);
-                resultsContainer.innerHTML = `<div class="detect-header">${gaugeHTML}</div><div class="highlighted-text-container">${highlightedHTML}</div>`;
+                const detection = data.detection_result;
+                if (!detection) {
+                    errorMessage.textContent = "Received an invalid detection result.";
+                    return;
+                }
+                // **UI FIX:** This function now returns raw HTML without <pre> tags.
+                const highlightedHTML = createHighlightedTextHTML(inputText.value, detection.red_flags || []);
+                const gaugeHTML = createGaugeHTML(detection.overall_score);
+                resultsContainer.innerHTML = `<div class="detect-header">${gaugeHTML}<p class="ai-analysis">${escapeHtml(detection.analysis)}</p></div><div class="highlighted-text-container">${highlightedHTML}</div>`;
                 break;
             case 'plagiarize':
-                resultsContainer.innerHTML = createPlagiarismReportHTML(data.plagiarism_report);
+                // **LOGIC FIX:** This function correctly processes the new structured object.
+                resultsContainer.innerHTML = createPlagiarismReportHTML(data.plagiarism_result);
                 break;
             case 'research':
-                const researchHTML = marked.parse(data.research_result);
+                // **LOGIC FIX:** This function correctly builds markdown from the structured object.
+                const researchData = data.research_result;
+                let markdownString = `## Research on: ${researchData.topic}\n\n`;
+                markdownString += `### Executive Summary\n${researchData.executive_summary}\n\n`;
+                markdownString += `### Historical Context\n${researchData.historical_context}\n\n`;
+                markdownString += `### Core Concepts\n` + researchData.core_concepts.map(c => `- ${c}`).join('\n') + `\n\n`;
+                markdownString += `### Controversies & Critiques\n` + researchData.controversies_and_critiques.map(c => `- ${c}`).join('\n') + `\n\n`;
+                markdownString += `### Practical Applications\n` + researchData.practical_applications.map(c => `- ${c}`).join('\n');
+                const researchHTML = marked.parse(markdownString);
                 resultsContainer.innerHTML = `<div class="research-result">${researchHTML}</div>`;
                 break;
         }
     }
 
-    function escapeHtml(unsafe) { return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // **UI FIX:** This helper no longer wraps the output in <pre> tags.
+    function createHighlightedTextHTML(originalText, sentencesToHighlight) {
+        let highlightedText = escapeHtml(originalText);
+        const highlightSet = new Set(sentencesToHighlight);
+        highlightSet.forEach(sentence => {
+            const escapedSentence = escapeHtml(sentence);
+            const regex = new RegExp(escapedSentence.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
+            highlightedText = highlightedText.replace(regex, `<mark>${escapedSentence}</mark>`);
+        });
+        // Convert newlines to <br> for proper rendering in a div.
+        return highlightedText.replace(/\n/g, '<br>');
+    }
+
     function createGaugeHTML(score) {
         let scoreMessage = `Low AI Likelihood`;
         let color = 'var(--green)';
@@ -135,15 +178,22 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (score > 35) { scoreMessage = `Moderate AI Likelihood`; color = 'var(--yellow)';}
         return `<div class="ai-score-container"><div class="ai-score-circle" style="--score-color: ${color}; --score-percent: ${score}"><span>${score}%</span></div><p class="ai-score-text">${scoreMessage}</p></div>`;
     }
+    
+    // **LOGIC FIX:** This function correctly processes the structured plagiarism object from the backend.
     function createPlagiarismReportHTML(report) {
-        if (report.trim().toUpperCase() === 'UNIQUE') { return `<div class="plagiarism-unique"><h3>No Significant Plagiarism Found</h3><p>The provided text appears to be unique.</p></div>`; }
-        const matches = report.split('\n').filter(line => line.includes('MATCH:'));
-        let html = '<h3>Potential Matches Found</h3><ul class="plagiarism-list">';
-        matches.forEach(match => {
-            const parts = match.split('|');
-            const phrase = parts[0].replace('MATCH:', '').trim();
-            const source = parts[1] ? parts[1].replace('SOURCE:', '').trim() : '#';
-            html += `<li><p>"${phrase}"</p><a href="${source}" target="_blank" rel="noopener noreferrer">Possible Source</a></li>`;
+        if (!report || !report.is_similarity_found) {
+            return `<div class="plagiarism-unique"><h3>No Significant Plagiarism Found</h3><p>The provided text appears to be unique based on our analysis.</p><p class="confidence-score">Overall Confidence: ${((report.overall_confidence || 0) * 100).toFixed(0)}%</p></div>`;
+        }
+
+        let html = `<h3>Potential Matches Found</h3><p class="confidence-score">Overall Confidence: ${(report.overall_confidence * 100).toFixed(0)}%</p><ul class="plagiarism-list">`;
+        report.matches.forEach(match => {
+            html += `<li>
+                <p class="plagiarism-text">"${escapeHtml(match.matching_text)}"</p>
+                <div class="plagiarism-source">
+                    <strong>Possible Source:</strong> ${escapeHtml(match.potential_source)}<br>
+                    <strong>Confidence:</strong> ${(match.confidence * 100).toFixed(0)}%
+                </div>
+            </li>`;
         });
         html += '</ul>';
         return html;

@@ -10,118 +10,172 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// --- Stats Tracker ---
-type StatsTracker struct {
-	mu            sync.Mutex
-	HumanizeCount int
-	DetectCount   int
-	PlagiarizeCount int
-	ResearchCount int
-	hub           *Hub
-}
+const (
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+)
 
-func NewStatsTracker(h *Hub) *StatsTracker {
-	return &StatsTracker{hub: h}
-}
-
-func (st *StatsTracker) Increment(action string) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-
-	switch action {
-	case "humanize":
-		st.HumanizeCount++
-	case "detect":
-		st.DetectCount++
-	case "plagiarize":
-		st.PlagiarizeCount++
-	case "research":
-		st.ResearchCount++
-	}
-}
-
-func (st *StatsTracker) GetStats() map[string]interface{} {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	return map[string]interface{}{
-		"type":            "stats",
-		"humanize_count":  st.HumanizeCount,
-		"detect_count":    st.DetectCount,
-		"plagiarize_count": st.PlagiarizeCount,
-		"research_count":  st.ResearchCount,
-	}
-}
-
-// --- WebSocket Hub ---
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin:     func(r *http.Request) bool { return true },
+}
+
+type Client struct {
+	hub  *Hub
+	conn *websocket.Conn
+	send chan []byte
+}
+
+func (c *Client) readPump() {
+	defer func() {
+		c.hub.unregister <- c
+		c.conn.Close()
+	}()
+	c.conn.SetReadLimit(512)
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	for {
+		if _, _, err := c.conn.ReadMessage(); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("error: %v", err)
+			}
+			break
+		}
+	}
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+	for {
+		select {
+		case message, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if !ok {
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				return
+			}
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
 }
 
 type Hub struct {
-	clients    map[*websocket.Conn]bool
-	register   chan *websocket.Conn
-	unregister chan *websocket.Conn
-	mu         sync.Mutex
+	clients    map[*Client]bool
+	broadcast  chan []byte
+	register   chan *Client
+	unregister chan *Client
+	mu         sync.RWMutex
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[*websocket.Conn]bool),
-		register:   make(chan *websocket.Conn),
-		unregister: make(chan *websocket.Conn),
+		broadcast:  make(chan []byte),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
+		clients:    make(map[*Client]bool),
 	}
 }
 
-func (h *Hub) Run(st *StatsTracker) {
-	// Ticker to broadcast stats every 2 seconds
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
+func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-			// Send initial stats immediately on connection
-			h.broadcastMessage(st.GetStats())
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				client.Close()
+				close(client.send)
 			}
 			h.mu.Unlock()
-		case <-ticker.C:
-			h.broadcastMessage(st.GetStats())
+		case message := <-h.broadcast:
+			h.mu.Lock()
+			for client := range h.clients {
+				select {
+				case client.send <- message:
+				default:
+					close(client.send)
+					delete(h.clients, client)
+				}
+			}
+			h.mu.Unlock()
 		}
 	}
 }
 
-func (h *Hub) broadcastMessage(message map[string]interface{}) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	
-	msgBytes, err := json.Marshal(message)
-	if err != nil {
-		log.Println("Error marshaling broadcast message:", err)
-		return
-	}
-
-	for client := range h.clients {
-		if err := client.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
-			log.Println("WebSocket write error:", err)
-			client.Close()
-			delete(h.clients, client)
-		}
-	}
-}
-
-func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
+func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request, st *StatsTracker) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("WebSocket upgrade error:", err)
+		log.Println(err)
 		return
 	}
-	h.register <- conn
+	client := &Client{hub: h, conn: conn, send: make(chan []byte, 256)}
+	client.hub.register <- client
+
+	st.BroadcastStats()
+
+	go client.writePump()
+	go client.readPump()
+}
+
+type StatsTracker struct {
+	mu     sync.RWMutex
+	hub    *Hub
+	counts map[string]int
+}
+
+func NewStatsTracker(hub *Hub) *StatsTracker {
+	return &StatsTracker{
+		hub: hub,
+		counts: map[string]int{
+			"humanize":   0,
+			"detect":     0,
+			"plagiarize": 0,
+			"research":   0,
+		},
+	}
+}
+
+func (st *StatsTracker) Increment(action string) {
+	st.mu.Lock()
+	if _, ok := st.counts[action]; ok {
+		st.counts[action]++
+	}
+	st.mu.Unlock()
+
+	st.BroadcastStats()
+}
+
+func (st *StatsTracker) BroadcastStats() {
+	st.mu.RLock()
+	payload := map[string]interface{}{
+		"type":             "stats",
+		"humanize_count":   st.counts["humanize"],
+		"detect_count":     st.counts["detect"],
+		"plagiarize_count": st.counts["plagiarize"],
+		"research_count":   st.counts["research"],
+	}
+	st.mu.RUnlock()
+
+	msgBytes, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Error marshaling stats: %v", err)
+		return
+	}
+	st.hub.broadcast <- msgBytes
 }
